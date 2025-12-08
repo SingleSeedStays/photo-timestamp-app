@@ -411,6 +411,8 @@ class PhotoTimestampApp {
             this.savePhotos();
             this.renderGallery();
             this.closePhotoModal();
+            this.photoModal.classList.add('hidden');
+            this.currentPhotoIndex = null;
         }
     }
 
@@ -418,12 +420,78 @@ class PhotoTimestampApp {
         if (this.currentPhotoIndex === null) return;
 
         const photo = this.photos[this.currentPhotoIndex];
-        const link = document.createElement('a');
-        link.href = photo.dataUrl;
-        link.download = `timestamp_photo_${new Date(photo.timestamp).toISOString().replace(/[:.]/g, '-')}.jpg`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+
+        // Detect iOS
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+        if (isIOS) {
+            // For iOS: Open image in new window where user can long-press to save
+            const newWindow = window.open('', '_blank');
+            if (newWindow) {
+                newWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <style>
+                            body {
+                                margin: 0;
+                                padding: 20px;
+                                background: #000;
+                                display: flex;
+                                flex-direction: column;
+                                align-items: center;
+                                justify-content: center;
+                                min-height: 100vh;
+                                font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+                            }
+                            .instructions {
+                                color: #fff;
+                                text-align: center;
+                                padding: 20px;
+                                background: rgba(255,255,255,0.1);
+                                border-radius: 12px;
+                                margin-bottom: 20px;
+                                max-width: 90%;
+                            }
+                            .instructions h2 {
+                                margin: 0 0 10px 0;
+                                font-size: 18px;
+                            }
+                            .instructions p {
+                                margin: 5px 0;
+                                font-size: 14px;
+                                opacity: 0.9;
+                            }
+                            img {
+                                max-width: 90%;
+                                height: auto;
+                                border-radius: 8px;
+                                box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="instructions">
+                            <h2>📸 Save to Photos</h2>
+                            <p><strong>Long press</strong> the image below</p>
+                            <p>Then tap <strong>"Add to Photos"</strong></p>
+                        </div>
+                        <img src="${photo.dataUrl}" alt="Timestamped Photo">
+                    </body>
+                    </html>
+                `);
+                newWindow.document.close();
+            }
+        } else {
+            // For desktop/Android: Standard download
+            const link = document.createElement('a');
+            link.href = photo.dataUrl;
+            link.download = `timestamp_photo_${new Date(photo.timestamp).toISOString().replace(/[:.]/g, '-')}.jpg`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
     }
 
     openSettings() {
