@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
@@ -8,16 +9,23 @@
     <meta name="apple-mobile-web-app-title" content="TimeStamp">
     <meta name="theme-color" content="#000000">
     <meta name="description" content="Capture photos with automatic timestamp overlay">
-    
+
     <title>TimeStamp - Photo Timestamp App</title>
-    
+
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600;700&family=SF+Mono&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600;700&family=SF+Mono&display=swap"
+        rel="stylesheet">
+
+    <!-- Google API Libraries -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
+
 <body>
     <div id="app">
         <!-- Header -->
@@ -27,11 +35,20 @@
                     <span class="logo-icon">📷</span>
                     <h1>TimeStamp</h1>
                 </div>
-                <button id="switchCameraBtn" class="icon-btn" aria-label="Switch Camera">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M16 3h5v5M8 21H3v-5M21 3l-7 7M3 21l7-7"/>
-                    </svg>
-                </button>
+                <div class="header-actions">
+                    <button id="googleSignInBtn" class="google-btn hidden" aria-label="Sign in with Google">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path
+                                d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z" />
+                        </svg>
+                        <span>Sign In</span>
+                    </button>
+                    <button id="switchCameraBtn" class="icon-btn" aria-label="Switch Camera">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M16 3h5v5M8 21H3v-5M21 3l-7 7M3 21l7-7" />
+                        </svg>
+                    </button>
+                </div>
             </div>
         </header>
 
@@ -46,8 +63,20 @@
                     <div class="corner bottom-right"></div>
                 </div>
                 <div class="live-timestamp" id="liveTimestamp"></div>
+
+                <!-- Property Detection Indicator -->
+                <div id="propertyIndicator" class="property-indicator hidden">
+                    <div class="property-icon">🏠</div>
+                    <div class="property-name" id="propertyName">Detecting location...</div>
+                </div>
+
+                <!-- Sync Status -->
+                <div id="syncStatus" class="sync-status hidden">
+                    <div class="sync-icon">☁️</div>
+                    <div class="sync-message">Uploading...</div>
+                </div>
             </div>
-            
+
             <!-- Permission/Error States -->
             <div id="permissionPrompt" class="state-overlay hidden">
                 <div class="state-content">
@@ -57,7 +86,7 @@
                     <button id="requestPermissionBtn" class="primary-btn">Enable Camera</button>
                 </div>
             </div>
-            
+
             <div id="errorState" class="state-overlay hidden">
                 <div class="state-content">
                     <div class="state-icon">⚠️</div>
@@ -76,21 +105,22 @@
                     <span>Your photos will appear here</span>
                 </div>
             </div>
-            
+
             <!-- Capture Button -->
             <div class="capture-controls">
                 <button id="galleryBtn" class="gallery-preview-btn" aria-label="View Gallery">
                     <div class="preview-thumb" id="lastPhotoThumb"></div>
                 </button>
-                
+
                 <button id="captureBtn" class="capture-btn" aria-label="Capture Photo">
                     <div class="capture-btn-inner"></div>
                 </button>
-                
+
                 <button id="settingsBtn" class="icon-btn" aria-label="Settings">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3"/>
-                        <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+                        <circle cx="12" cy="12" r="3" />
+                        <path
+                            d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
                     </svg>
                 </button>
             </div>
@@ -103,13 +133,14 @@
                 <div class="modal-header">
                     <button id="closeModalBtn" class="icon-btn" aria-label="Close">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 6L6 18M6 6l12 12"/>
+                            <path d="M18 6L6 18M6 6l12 12" />
                         </svg>
                     </button>
                     <span class="modal-title">Photo Preview</span>
                     <button id="deletePhotoBtn" class="icon-btn danger" aria-label="Delete">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                            <path
+                                d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
                         </svg>
                     </button>
                 </div>
@@ -119,7 +150,7 @@
                 <div class="modal-footer">
                     <button id="downloadBtn" class="primary-btn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
                         </svg>
                         Save to Photos
                     </button>
@@ -134,7 +165,7 @@
                 <div class="modal-header">
                     <button id="closeSettingsBtn" class="icon-btn" aria-label="Close">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 6L6 18M6 6l12 12"/>
+                            <path d="M18 6L6 18M6 6l12 12" />
                         </svg>
                     </button>
                     <span class="modal-title">Settings</span>
@@ -164,7 +195,8 @@
                         <div class="setting-option">
                             <label>Color</label>
                             <div class="color-options">
-                                <button class="color-btn active" data-color="#FFFFFF" style="background: #FFFFFF;"></button>
+                                <button class="color-btn active" data-color="#FFFFFF"
+                                    style="background: #FFFFFF;"></button>
                                 <button class="color-btn" data-color="#FFD700" style="background: #FFD700;"></button>
                                 <button class="color-btn" data-color="#FF6B6B" style="background: #FF6B6B;"></button>
                                 <button class="color-btn" data-color="#4ECDC4" style="background: #4ECDC4;"></button>
@@ -196,6 +228,9 @@
     <!-- Hidden Canvas for Processing -->
     <canvas id="photoCanvas" style="display: none;"></canvas>
 
+    <script src="google-config.js"></script>
+    <script src="google-drive-service.js"></script>
     <script src="app.js"></script>
 </body>
+
 </html>

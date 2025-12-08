@@ -288,16 +288,32 @@ class PhotoTimestampApp {
         // Convert to data URL
         const dataUrl = this.canvas.toDataURL('image/jpeg', 0.92);
 
+        // Get current location from Google Drive service
+        const location = (typeof googleDriveService !== 'undefined' && googleDriveService.currentLocation)
+            ? googleDriveService.currentLocation
+            : null;
+
+        const property = (typeof googleDriveService !== 'undefined' && googleDriveService.currentProperty)
+            ? googleDriveService.currentProperty.name
+            : null;
+
         // Save photo
         const photo = {
             id: Date.now(),
             dataUrl: dataUrl,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            location: location,
+            property: property
         };
 
         this.photos.unshift(photo);
         this.savePhotos();
         this.renderGallery();
+
+        // Upload to Google Drive if signed in
+        if (typeof googleDriveService !== 'undefined' && googleDriveService.isSignedIn) {
+            googleDriveService.uploadPhoto(dataUrl, property);
+        }
     }
 
     drawTimestamp(text, width, height) {

@@ -1,0 +1,461 @@
+// ===== Google Drive Integration Service =====
+
+class GoogleDriveService {
+    constructor() {
+        this.accessToken = null;
+        this.isSignedIn = false;
+        this.rootFolderId = null;
+        this.spreadsheetId = null;
+        this.tokenClient = null;
+
+        // UI Elements
+        this.signInBtn = document.getElementById('googleSignInBtn');
+        this.propertyIndicator = document.getElementById('propertyIndicator');
+        this.propertyNameEl = document.getElementById('propertyName');
+        this.syncStatus = document.getElementById('syncStatus');
+
+        // Current location
+        this.currentLocation = null;
+        this.currentProperty = null;
+
+        // Initialize
+        this.init();
+    }
+
+    async init() {
+        // Show sign-in button
+        if (this.signInBtn) {
+            this.signInBtn.classList.remove('hidden');
+            this.signInBtn.addEventListener('click', () => this.handleSignIn());
+        }
+
+        // Initialize Google Identity Services
+        this.initializeGoogleAuth();
+
+        // Start watching location
+        this.startLocationWatching();
+
+        // Check for existing session
+        this.checkExistingSession();
+    }
+
+    initializeGoogleAuth() {
+        // Wait for Google Identity Services to load
+        const checkGIS = setInterval(() => {
+            if (typeof google !== 'undefined' && google.accounts) {
+                clearInterval(checkGIS);
+
+                this.tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: GOOGLE_CONFIG.clientId,
+                    scope: GOOGLE_CONFIG.scopes.join(' '),
+                    callback: (response) => this.handleAuthResponse(response)
+                });
+
+                console.log('Google Auth initialized');
+            }
+        }, 100);
+
+        // Timeout after 10 seconds
+        setTimeout(() => clearInterval(checkGIS), 10000);
+    }
+
+    checkExistingSession() {
+        const savedToken = localStorage.getItem('googleAccessToken');
+        const tokenExpiry = localStorage.getItem('googleTokenExpiry');
+
+        if (savedToken && tokenExpiry && Date.now() < parseInt(tokenExpiry)) {
+            this.accessToken = savedToken;
+            this.isSignedIn = true;
+            this.updateSignInUI();
+        }
+    }
+
+    handleSignIn() {
+        if (this.isSignedIn) {
+            this.signOut();
+        } else {
+            if (this.tokenClient) {
+                this.tokenClient.requestAccessToken();
+            } else {
+                alert('Google Sign-In is still loading. Please try again in a moment.');
+            }
+        }
+    }
+
+    handleAuthResponse(response) {
+        if (response.error) {
+            console.error('Auth error:', response.error);
+            this.showSyncStatus('Sign-in failed', 'error');
+            return;
+        }
+
+        this.accessToken = response.access_token;
+        this.isSignedIn = true;
+
+        // Save token (expires in ~1 hour)
+        localStorage.setItem('googleAccessToken', this.accessToken);
+        localStorage.setItem('googleTokenExpiry', Date.now() + 3500000);
+
+        this.updateSignInUI();
+        this.showSyncStatus('Signed in!', 'success');
+
+        // Set up Drive folders
+        this.setupDriveFolders();
+    }
+
+    signOut() {
+        this.accessToken = null;
+        this.isSignedIn = false;
+        localStorage.removeItem('googleAccessToken');
+        localStorage.removeItem('googleTokenExpiry');
+        this.updateSignInUI();
+    }
+
+    updateSignInUI() {
+        if (this.signInBtn) {
+            if (this.isSignedIn) {
+                this.signInBtn.classList.add('signed-in');
+                this.signInBtn.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                    <span>Synced</span>
+                `;
+            } else {
+                this.signInBtn.classList.remove('signed-in');
+                this.signInBtn.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/>
+                    </svg>
+                    <span>Sign In</span>
+                `;
+            }
+        }
+    }
+
+    // ===== Location Services =====
+
+    startLocationWatching() {
+        if (!navigator.geolocation) {
+            console.log('Geolocation not supported');
+            return;
+        }
+
+        // Get initial location
+        this.getCurrentLocation();
+
+        // Watch for location changes
+        navigator.geolocation.watchPosition(
+            (position) => this.handleLocationUpdate(position),
+            (error) => console.log('Location error:', error.message),
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+        );
+    }
+
+    getCurrentLocation() {
+        return new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    this.handleLocationUpdate(position);
+                    resolve(position);
+                },
+                (error) => {
+                    console.log('Location error:', error.message);
+                    reject(error);
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        });
+    }
+
+    handleLocationUpdate(position) {
+        this.currentLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            accuracy: position.coords.accuracy
+        };
+
+        // Detect property
+        const property = detectProperty(this.currentLocation.lat, this.currentLocation.lng);
+
+        if (property) {
+            this.currentProperty = property;
+            this.showPropertyIndicator(property.name);
+        } else {
+            this.currentProperty = null;
+            this.hidePropertyIndicator();
+        }
+    }
+
+    showPropertyIndicator(name) {
+        if (this.propertyIndicator && this.propertyNameEl) {
+            this.propertyNameEl.textContent = name;
+            this.propertyIndicator.classList.remove('hidden');
+        }
+    }
+
+    hidePropertyIndicator() {
+        if (this.propertyIndicator) {
+            this.propertyIndicator.classList.add('hidden');
+        }
+    }
+
+    // ===== Google Drive API =====
+
+    async setupDriveFolders() {
+        try {
+            // Find or create root folder
+            this.rootFolderId = await this.findOrCreateFolder(GOOGLE_CONFIG.rootFolderName, 'root');
+            console.log('Root folder ready:', this.rootFolderId);
+
+            // Find or create spreadsheet
+            await this.findOrCreateSpreadsheet();
+            console.log('Spreadsheet ready:', this.spreadsheetId);
+
+        } catch (error) {
+            console.error('Error setting up Drive:', error);
+        }
+    }
+
+    async findOrCreateFolder(name, parentId) {
+        // Search for existing folder
+        const query = `name='${name}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`;
+
+        const searchResponse = await fetch(
+            `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}`,
+            {
+                headers: { 'Authorization': `Bearer ${this.accessToken}` }
+            }
+        );
+
+        const searchResult = await searchResponse.json();
+
+        if (searchResult.files && searchResult.files.length > 0) {
+            return searchResult.files[0].id;
+        }
+
+        // Create new folder
+        const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${this.accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: name,
+                mimeType: 'application/vnd.google-apps.folder',
+                parents: [parentId]
+            })
+        });
+
+        const folder = await createResponse.json();
+        return folder.id;
+    }
+
+    async findOrCreateSpreadsheet() {
+        // Search for existing spreadsheet
+        const query = `name='${GOOGLE_CONFIG.spreadsheetName}' and mimeType='application/vnd.google-apps.spreadsheet' and '${this.rootFolderId}' in parents and trashed=false`;
+
+        const searchResponse = await fetch(
+            `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}`,
+            {
+                headers: { 'Authorization': `Bearer ${this.accessToken}` }
+            }
+        );
+
+        const searchResult = await searchResponse.json();
+
+        if (searchResult.files && searchResult.files.length > 0) {
+            this.spreadsheetId = searchResult.files[0].id;
+            return;
+        }
+
+        // Create new spreadsheet
+        const createResponse = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${this.accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                properties: { title: GOOGLE_CONFIG.spreadsheetName },
+                sheets: [{
+                    properties: { title: 'Photo Log' },
+                    data: [{
+                        rowData: [{
+                            values: [
+                                { userEnteredValue: { stringValue: 'Property Name' } },
+                                { userEnteredValue: { stringValue: 'Date' } },
+                                { userEnteredValue: { stringValue: 'Time' } },
+                                { userEnteredValue: { stringValue: 'Filename' } },
+                                { userEnteredValue: { stringValue: 'GPS Coordinates' } },
+                                { userEnteredValue: { stringValue: 'Drive Link' } }
+                            ]
+                        }]
+                    }]
+                }]
+            })
+        });
+
+        const spreadsheet = await createResponse.json();
+        this.spreadsheetId = spreadsheet.spreadsheetId;
+
+        // Move spreadsheet to root folder
+        await fetch(`https://www.googleapis.com/drive/v3/files/${this.spreadsheetId}?addParents=${this.rootFolderId}`, {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${this.accessToken}` }
+        });
+    }
+
+    // ===== Upload Photo =====
+
+    async uploadPhoto(dataUrl, propertyName = null) {
+        if (!this.isSignedIn || !this.accessToken) {
+            console.log('Not signed in, skipping upload');
+            return null;
+        }
+
+        const property = propertyName || (this.currentProperty ? this.currentProperty.name : 'Unknown Location');
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0]; // 2025-12-08
+        const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-'); // 17-30-00
+        const filename = `photo_${timeStr}.jpg`;
+
+        this.showSyncStatus('Uploading...', 'uploading');
+
+        try {
+            // Ensure folders exist
+            if (!this.rootFolderId) {
+                await this.setupDriveFolders();
+            }
+
+            // Create property folder
+            const propertyFolderId = await this.findOrCreateFolder(property, this.rootFolderId);
+
+            // Create date folder
+            const dateFolderId = await this.findOrCreateFolder(dateStr, propertyFolderId);
+
+            // Convert data URL to blob
+            const blob = await this.dataUrlToBlob(dataUrl);
+
+            // Upload file using multipart upload
+            const metadata = {
+                name: filename,
+                parents: [dateFolderId],
+                mimeType: 'image/jpeg'
+            };
+
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            form.append('file', blob);
+
+            const uploadResponse = await fetch(
+                'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',
+                {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${this.accessToken}` },
+                    body: form
+                }
+            );
+
+            const file = await uploadResponse.json();
+
+            // Log to spreadsheet
+            await this.logToSpreadsheet(property, now, filename, file.webViewLink);
+
+            this.showSyncStatus(`Saved to ${property}`, 'success');
+
+            return file;
+
+        } catch (error) {
+            console.error('Upload error:', error);
+            this.showSyncStatus('Upload failed', 'error');
+            return null;
+        }
+    }
+
+    async logToSpreadsheet(propertyName, date, filename, driveLink) {
+        if (!this.spreadsheetId) return;
+
+        const dateStr = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' });
+        const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const gpsStr = this.currentLocation
+            ? `${this.currentLocation.lat.toFixed(6)}, ${this.currentLocation.lng.toFixed(6)}`
+            : 'N/A';
+
+        const values = [[propertyName, dateStr, timeStr, filename, gpsStr, driveLink || '']];
+
+        await fetch(
+            `https://sheets.googleapis.com/v4/spreadsheets/${this.spreadsheetId}/values/Photo Log!A:F:append?valueInputOption=USER_ENTERED`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ values })
+            }
+        );
+    }
+
+    dataUrlToBlob(dataUrl) {
+        return new Promise((resolve) => {
+            const arr = dataUrl.split(',');
+            const mime = arr[0].match(/:(.*?);/)[1];
+            const bstr = atob(arr[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while (n--) {
+                u8arr[n] = bstr.charCodeAt(n);
+            }
+            resolve(new Blob([u8arr], { type: mime }));
+        });
+    }
+
+    showSyncStatus(message, type = 'uploading') {
+        if (!this.syncStatus) return;
+
+        const icon = this.syncStatus.querySelector('.sync-icon');
+        const msg = this.syncStatus.querySelector('.sync-message');
+
+        switch (type) {
+            case 'success':
+                icon.textContent = '✓';
+                this.syncStatus.className = 'sync-status success';
+                break;
+            case 'error':
+                icon.textContent = '✕';
+                this.syncStatus.className = 'sync-status error';
+                break;
+            default:
+                icon.textContent = '☁️';
+                this.syncStatus.className = 'sync-status';
+        }
+
+        msg.textContent = message;
+        this.syncStatus.classList.remove('hidden');
+
+        // Hide after 3 seconds for success/error
+        if (type !== 'uploading') {
+            setTimeout(() => {
+                this.syncStatus.classList.add('hidden');
+            }, 3000);
+        }
+    }
+
+    hideSyncStatus() {
+        if (this.syncStatus) {
+            this.syncStatus.classList.add('hidden');
+        }
+    }
+}
+
+// Initialize Google Drive Service
+let googleDriveService = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize after a short delay to ensure other scripts are loaded
+    setTimeout(() => {
+        googleDriveService = new GoogleDriveService();
+    }, 500);
+});
