@@ -19,6 +19,9 @@ const GOOGLE_CONFIG = {
     // Root folder name in Google Drive
     rootFolderName: 'Photo Timestamp App',
 
+    // Shared folder ID (all photos upload here)
+    sharedFolderId: '1hWcLenRN88WjkDFT-n3Rl9xgUyToyovA',
+
     // Spreadsheet name for logging
     spreadsheetName: 'Photo Log',
 

@@ -204,11 +204,11 @@ class GoogleDriveService {
 
     async setupDriveFolders() {
         try {
-            // Find or create root folder
-            this.rootFolderId = await this.findOrCreateFolder(GOOGLE_CONFIG.rootFolderName, 'root');
-            console.log('Root folder ready:', this.rootFolderId);
+            // Use the shared folder ID instead of creating a new one
+            this.rootFolderId = GOOGLE_CONFIG.sharedFolderId;
+            console.log('Using shared folder:', this.rootFolderId);
 
-            // Find or create spreadsheet
+            // Find or create spreadsheet in the shared folder
             await this.findOrCreateSpreadsheet();
             console.log('Spreadsheet ready:', this.spreadsheetId);
 
