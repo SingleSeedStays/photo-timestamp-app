@@ -223,13 +223,13 @@ class GoogleDriveService {
 
     async setupDriveFolders() {
         try {
-            // Use the shared folder ID instead of creating a new one
+            // Use the shared folder ID
             this.rootFolderId = GOOGLE_CONFIG.sharedFolderId;
             console.log('Using shared folder:', this.rootFolderId);
 
-            // Find or create spreadsheet in the shared folder
-            await this.findOrCreateSpreadsheet();
-            console.log('Spreadsheet ready:', this.spreadsheetId);
+            // Use the hardcoded spreadsheet ID (no more searching!)
+            this.spreadsheetId = GOOGLE_CONFIG.spreadsheetId;
+            console.log('Using hardcoded spreadsheet:', this.spreadsheetId);
 
         } catch (error) {
             console.error('Error setting up Drive:', error);
@@ -369,7 +369,6 @@ class GoogleDriveService {
             return null;
         }
 
-        const property = propertyName || (this.currentProperty ? this.currentProperty.name : 'Unknown Location');
         const now = new Date();
 
         // Format date and time in Eastern Standard Time
@@ -377,6 +376,7 @@ class GoogleDriveService {
         const dateStr = now.toLocaleDateString('en-CA', estOptions); // 2025-12-08 format
         const timeStr = now.toLocaleTimeString('en-GB', { ...estOptions, hour12: false }).replace(/:/g, '-'); // 19-04-23
         const emailPrefix = this.userEmail ? this.userEmail.split('@')[0] : 'unknown';
+        const property = this.currentProperty ? this.currentProperty.name : 'Unknown Location';
         const filename = `${property}_${dateStr}_${timeStr}_${emailPrefix}.jpg`;
 
         this.showSyncStatus('Uploading...', 'uploading');
@@ -392,12 +392,23 @@ class GoogleDriveService {
                 throw new Error('Failed to create root folder');
             }
 
-            console.log('Creating property folder:', property);
-            // Create property folder
-            const propertyFolderId = await this.findOrCreateFolder(property, this.rootFolderId);
+            // Get the property and its folder ID
+            let propertyFolderId;
+            let propertyDisplayName;
 
-            console.log('Creating date folder:', dateStr);
-            // Create date folder
+            if (this.currentProperty && this.currentProperty.folderId) {
+                // Use the detected property's folder
+                propertyFolderId = this.currentProperty.folderId;
+                propertyDisplayName = this.currentProperty.name;
+            } else {
+                // Use Unknown Location folder
+                propertyFolderId = GOOGLE_CONFIG.unknownLocationFolderId;
+                propertyDisplayName = 'Unknown Location';
+            }
+
+            console.log('Using property folder:', propertyDisplayName, propertyFolderId);
+
+            // Create or find date folder inside property folder
             const dateFolderId = await this.findOrCreateFolder(dateStr, propertyFolderId);
 
             console.log('Converting to blob...');
