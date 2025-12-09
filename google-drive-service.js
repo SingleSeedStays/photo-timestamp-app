@@ -403,12 +403,21 @@ class GoogleDriveService {
             } else {
                 // Use Unknown Location folder
                 propertyFolderId = GOOGLE_CONFIG.unknownLocationFolderId;
-                propertyDisplayName = 'Unknown Location';
+
+                // Try to get City, State for the display name
+                if (this.currentLocation) {
+                    const cityState = await this.getCityState(this.currentLocation.lat, this.currentLocation.lng);
+                    propertyDisplayName = cityState || 'Unknown Location';
+                } else {
+                    propertyDisplayName = 'Unknown Location';
+                }
             }
 
-            console.log('Using property folder:', propertyDisplayName, propertyFolderId);
+            console.log('Using location:', propertyDisplayName, propertyFolderId);
 
             // Create or find date folder inside property folder
+            // For Unknown Location/City State, we still put it in the "Unknown Location" folder (ID)
+            // but we log the specific City/State name in the spreadsheet and filename
             const dateFolderId = await this.findOrCreateFolder(dateStr, propertyFolderId);
 
             console.log('Converting to blob...');
@@ -417,6 +426,10 @@ class GoogleDriveService {
 
             console.log('Uploading file...');
             // Upload file using multipart upload
+            // Sanitize filename to remove commas/spaces for the file system
+            const safeLocationName = propertyDisplayName.replace(/[^a-zA-Z0-9]/g, '_');
+            const filename = `${safeLocationName}_${dateStr}_${timeStr}_${emailPrefix}.jpg`;
+
             const metadata = {
                 name: filename,
                 parents: [dateFolderId],
@@ -455,13 +468,13 @@ class GoogleDriveService {
 
             // Log to spreadsheet
             try {
-                await this.logToSpreadsheet(property, now, filename, file.webViewLink);
+                await this.logToSpreadsheet(propertyDisplayName, now, filename, file.webViewLink);
             } catch (sheetError) {
                 console.error('Spreadsheet logging error:', sheetError);
                 // Don't fail the whole upload if just the logging fails
             }
 
-            this.showSyncStatus(`✓ Saved to ${property}`, 'success');
+            this.showSyncStatus(`✓ Saved to ${propertyDisplayName}`, 'success');
 
             return file;
 
@@ -551,18 +564,11 @@ class GoogleDriveService {
             );
 
             const result = await response.json();
+            const headers = [['Location', 'Date', 'Time', 'Filename', 'GPS Coordinates', 'Drive Link', 'Uploaded By']];
 
-            // If no values or first cell is not "Property Name", add headers
-            if (!result.values || result.values.length === 0 || result.values[0][0] !== 'Property Name') {
-                console.log('Adding headers to spreadsheet...');
-                const headers = [['Property Name', 'Date', 'Time', 'Filename', 'GPS Coordinates', 'Drive Link', 'Uploaded By']];
-
-                // Insert at the top (prepend) by using insertDataOption=INSERT_ROWS if you wanted to push down, 
-                // but since we want to possibly overwrite or just ensure they exist if empty:
-
-                // If it's completely empty, append is fine. If it has data but no headers, we might want to insert.
-                // For safety/simplification, we'll just PREPEND using a separate insert call if it appears empty/wrong.
-                // Actually, if we just append, it goes to bottom. We want A1.
+            // If no values OR first cell is not "Location" (even if it is "Property Name"), update headers
+            if (!result.values || result.values.length === 0 || result.values[0][0] !== 'Location') {
+                console.log('Updating headers to spreadsheet...');
 
                 await fetch(
                     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(sheetTitle)}!A1:G1?valueInputOption=USER_ENTERED`,
@@ -575,10 +581,32 @@ class GoogleDriveService {
                         body: JSON.stringify({ values: headers })
                     }
                 );
-                console.log('Headers added');
+                console.log('Headers updated to include Location');
             }
         } catch (error) {
             console.error('Error checking headers:', error);
+        }
+    }
+
+    async getCityState(lat, lng) {
+        try {
+            // Using OpenStreetMap Nominatim for free reverse geocoding
+            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10`);
+            const data = await response.json();
+
+            const address = data.address;
+            if (address) {
+                const city = address.city || address.town || address.village || address.hamlet;
+                const state = address.state;
+
+                if (city && state) return `${city}, ${state}`;
+                if (city) return city;
+                if (state) return state;
+            }
+            return null;
+        } catch (error) {
+            console.error('Reverse geocoding failed:', error);
+            return null;
         }
     }
 
