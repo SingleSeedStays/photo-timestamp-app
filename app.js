@@ -491,7 +491,8 @@ class PhotoTimestampApp {
                         <div class="instructions">
                             <h2>📸 Save to Photos</h2>
                             <p><strong>Long press</strong> the image below</p>
-                            <p>Then tap <strong>"Add to Photos"</strong></p>
+                            <p>Tap <strong>"Save image in..."</strong></p>
+                            <p>Then tap <strong>"Save in Photos"</strong></p>
                         </div>
                         <img src="${photo.dataUrl}" alt="Timestamped Photo">
                     </body>
