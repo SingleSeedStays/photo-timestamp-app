@@ -237,19 +237,21 @@ class GoogleDriveService {
     }
 
     async findOrCreateFolder(name, parentId) {
-        // Search for existing folder
+        // Search for existing folder in shared folder
         const query = `name='${name}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`;
 
         const searchResponse = await fetch(
-            `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}`,
+            `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=allDrives`,
             {
                 headers: { 'Authorization': `Bearer ${this.accessToken}` }
             }
         );
 
         const searchResult = await searchResponse.json();
+        console.log('Folder search result for', name, ':', searchResult);
 
         if (searchResult.files && searchResult.files.length > 0) {
+            console.log('Found existing folder:', name, searchResult.files[0].id);
             return searchResult.files[0].id;
         }
 
@@ -272,20 +274,22 @@ class GoogleDriveService {
     }
 
     async findOrCreateSpreadsheet() {
-        // Search for existing spreadsheet
+        // Search for existing spreadsheet in shared folder
         const query = `name='${GOOGLE_CONFIG.spreadsheetName}' and mimeType='application/vnd.google-apps.spreadsheet' and '${this.rootFolderId}' in parents and trashed=false`;
 
         const searchResponse = await fetch(
-            `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}`,
+            `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=allDrives`,
             {
                 headers: { 'Authorization': `Bearer ${this.accessToken}` }
             }
         );
 
         const searchResult = await searchResponse.json();
+        console.log('Spreadsheet search result:', searchResult);
 
         if (searchResult.files && searchResult.files.length > 0) {
             this.spreadsheetId = searchResult.files[0].id;
+            console.log('Found existing spreadsheet:', this.spreadsheetId);
             return;
         }
 
