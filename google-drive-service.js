@@ -310,8 +310,22 @@ class GoogleDriveService {
     // ===== Upload Photo =====
 
     async uploadPhoto(dataUrl, propertyName = null) {
+        console.log('Upload started, isSignedIn:', this.isSignedIn, 'hasToken:', !!this.accessToken);
+
         if (!this.isSignedIn || !this.accessToken) {
             console.log('Not signed in, skipping upload');
+            this.showSyncStatus('Sign in to sync', 'error');
+            return null;
+        }
+
+        // Check if token might be expired
+        const tokenExpiry = localStorage.getItem('googleTokenExpiry');
+        if (tokenExpiry && Date.now() > parseInt(tokenExpiry)) {
+            console.log('Token expired, requesting new token');
+            this.isSignedIn = false;
+            this.accessToken = null;
+            this.showSyncStatus('Session expired - Sign in again', 'error');
+            this.updateSignInUI();
             return null;
         }
 
@@ -326,18 +340,27 @@ class GoogleDriveService {
         try {
             // Ensure folders exist
             if (!this.rootFolderId) {
+                console.log('Setting up Drive folders...');
                 await this.setupDriveFolders();
             }
 
+            if (!this.rootFolderId) {
+                throw new Error('Failed to create root folder');
+            }
+
+            console.log('Creating property folder:', property);
             // Create property folder
             const propertyFolderId = await this.findOrCreateFolder(property, this.rootFolderId);
 
+            console.log('Creating date folder:', dateStr);
             // Create date folder
             const dateFolderId = await this.findOrCreateFolder(dateStr, propertyFolderId);
 
+            console.log('Converting to blob...');
             // Convert data URL to blob
             const blob = await this.dataUrlToBlob(dataUrl);
 
+            console.log('Uploading file...');
             // Upload file using multipart upload
             const metadata = {
                 name: filename,
@@ -358,18 +381,38 @@ class GoogleDriveService {
                 }
             );
 
+            if (!uploadResponse.ok) {
+                const errorData = await uploadResponse.json();
+                console.error('Upload response error:', errorData);
+
+                // Handle auth errors
+                if (uploadResponse.status === 401 || uploadResponse.status === 403) {
+                    this.signOut();
+                    this.showSyncStatus('Auth error - Sign in again', 'error');
+                    return null;
+                }
+
+                throw new Error(errorData.error?.message || 'Upload failed');
+            }
+
             const file = await uploadResponse.json();
+            console.log('Upload successful:', file);
 
             // Log to spreadsheet
-            await this.logToSpreadsheet(property, now, filename, file.webViewLink);
+            try {
+                await this.logToSpreadsheet(property, now, filename, file.webViewLink);
+            } catch (sheetError) {
+                console.error('Spreadsheet logging error:', sheetError);
+                // Don't fail the whole upload if just the logging fails
+            }
 
-            this.showSyncStatus(`Saved to ${property}`, 'success');
+            this.showSyncStatus(`✓ Saved to ${property}`, 'success');
 
             return file;
 
         } catch (error) {
             console.error('Upload error:', error);
-            this.showSyncStatus('Upload failed', 'error');
+            this.showSyncStatus('Upload failed: ' + error.message, 'error');
             return null;
         }
     }
