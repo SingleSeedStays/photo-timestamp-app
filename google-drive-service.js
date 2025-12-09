@@ -14,6 +14,8 @@ class GoogleDriveService {
         this.propertyIndicator = document.getElementById('propertyIndicator');
         this.propertyNameEl = document.getElementById('propertyName');
         this.syncStatus = document.getElementById('syncStatus');
+        this.loginModal = document.getElementById('loginModal');
+        this.modalLoginBtn = document.getElementById('modalLoginBtn');
 
         // Current location
         this.currentLocation = null;
@@ -28,6 +30,14 @@ class GoogleDriveService {
         if (this.signInBtn) {
             this.signInBtn.classList.remove('hidden');
             this.signInBtn.addEventListener('click', () => this.handleSignIn());
+        }
+
+        // Handle modal login button
+        if (this.modalLoginBtn) {
+            this.modalLoginBtn.addEventListener('click', () => {
+                console.log('Modal login clicked');
+                this.handleSignIn();
+            });
         }
 
         // Initialize Google Identity Services
@@ -67,6 +77,9 @@ class GoogleDriveService {
         if (savedToken && tokenExpiry && Date.now() < parseInt(tokenExpiry)) {
             this.accessToken = savedToken;
             this.isSignedIn = true;
+            this.updateSignInUI();
+        } else {
+            // Ensure modal is shown if no session
             this.updateSignInUI();
         }
     }
@@ -131,6 +144,18 @@ class GoogleDriveService {
     }
 
     updateSignInUI() {
+        // Handle Modal Visibility
+        if (this.loginModal) {
+            if (this.isSignedIn) {
+                this.loginModal.classList.remove('hidden'); // Wait? If signed in, I want it HIDDEN.
+                // Wait, previous code had .hidden { opacity: 0; pointer-events: none; }
+                // So adding hidden hides it.
+                this.loginModal.classList.add('hidden');
+            } else {
+                this.loginModal.classList.remove('hidden');
+            }
+        }
+
         if (this.signInBtn) {
             if (this.isSignedIn) {
                 this.signInBtn.classList.add('signed-in');
