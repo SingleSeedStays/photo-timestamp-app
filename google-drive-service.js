@@ -351,8 +351,11 @@ class GoogleDriveService {
 
         const property = propertyName || (this.currentProperty ? this.currentProperty.name : 'Unknown Location');
         const now = new Date();
-        const dateStr = now.toISOString().split('T')[0]; // 2025-12-08
-        const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-'); // 17-30-00
+
+        // Format date and time in Eastern Standard Time
+        const estOptions = { timeZone: 'America/New_York' };
+        const dateStr = now.toLocaleDateString('en-CA', estOptions); // 2025-12-08 format
+        const timeStr = now.toLocaleTimeString('en-GB', { ...estOptions, hour12: false }).replace(/:/g, '-'); // 19-04-23
         const emailPrefix = this.userEmail ? this.userEmail.split('@')[0] : 'unknown';
         const filename = `${property}_${dateStr}_${timeStr}_${emailPrefix}.jpg`;
 
@@ -441,8 +444,10 @@ class GoogleDriveService {
     async logToSpreadsheet(propertyName, date, filename, driveLink) {
         if (!this.spreadsheetId) return;
 
-        const dateStr = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' });
-        const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        // Format date and time in Eastern Standard Time for spreadsheet
+        const estOptions = { timeZone: 'America/New_York' };
+        const dateStr = date.toLocaleDateString('en-US', { ...estOptions, year: 'numeric', month: 'short', day: '2-digit' });
+        const timeStr = date.toLocaleTimeString('en-US', { ...estOptions, hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const gpsStr = this.currentLocation
             ? `${this.currentLocation.lat.toFixed(6)}, ${this.currentLocation.lng.toFixed(6)}`
             : 'N/A';
