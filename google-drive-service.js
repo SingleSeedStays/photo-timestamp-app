@@ -11,6 +11,8 @@ class GoogleDriveService {
 
         // UI Elements
         this.signInBtn = document.getElementById('googleSignInBtn');
+        this.loginModal = document.getElementById('loginModal');
+        this.modalSignInBtn = document.getElementById('modalSignInBtn');
         this.propertyIndicator = document.getElementById('propertyIndicator');
         this.propertyNameEl = document.getElementById('propertyName');
         this.syncStatus = document.getElementById('syncStatus');
@@ -30,6 +32,11 @@ class GoogleDriveService {
             this.signInBtn.addEventListener('click', () => this.handleSignIn());
         }
 
+        // Bind modal sign-in button
+        if (this.modalSignInBtn) {
+            this.modalSignInBtn.addEventListener('click', () => this.handleSignIn());
+        }
+
         // Initialize Google Identity Services
         this.initializeGoogleAuth();
 
@@ -38,6 +45,11 @@ class GoogleDriveService {
 
         // Check for existing session
         this.checkExistingSession();
+
+        // Show login modal if not signed in
+        if (!this.isSignedIn) {
+            this.showLoginModal();
+        }
     }
 
     initializeGoogleAuth() {
@@ -68,6 +80,7 @@ class GoogleDriveService {
             this.accessToken = savedToken;
             this.isSignedIn = true;
             this.updateSignInUI();
+            this.onLoginSuccess();
         }
     }
 
@@ -102,9 +115,30 @@ class GoogleDriveService {
 
         this.updateSignInUI();
         this.showSyncStatus('Signed in!', 'success');
+        this.onLoginSuccess();
 
         // Set up Drive folders
         this.setupDriveFolders();
+    }
+
+    onLoginSuccess() {
+        this.hideLoginModal();
+        // Start the app (camera, etc.) once logged in
+        if (window.app && typeof window.app.startApp === 'function') {
+            window.app.startApp();
+        }
+    }
+
+    showLoginModal() {
+        if (this.loginModal) {
+            this.loginModal.classList.add('active');
+        }
+    }
+
+    hideLoginModal() {
+        if (this.loginModal) {
+            this.loginModal.classList.remove('active');
+        }
     }
 
     async getUserEmail() {
@@ -128,6 +162,7 @@ class GoogleDriveService {
         localStorage.removeItem('googleAccessToken');
         localStorage.removeItem('googleTokenExpiry');
         this.updateSignInUI();
+        this.showLoginModal();
     }
 
     updateSignInUI() {

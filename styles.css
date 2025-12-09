@@ -877,3 +877,113 @@ video {
 .confirm-btn:active {
     background: var(--bg-glass-light);
 }
+
+/* ===== Login Modal ===== */
+.login-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+}
+
+.login-modal-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.login-card {
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 40px;
+    width: 90%;
+    max-width: 360px;
+    text-align: center;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    border: none;
+    transform: translateY(20px);
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.login-modal-overlay.active .login-card {
+    transform: translateY(0);
+}
+
+.login-logo {
+    margin-bottom: 40px;
+}
+
+.logo-icon-large {
+    font-size: 64px;
+    display: block;
+    margin-bottom: 16px;
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+}
+
+.company-logo {
+    display: block;
+    width: 189px;
+    height: auto;
+    margin: 0 auto 16px auto;
+}
+
+.login-logo h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: #1c1c1e;
+}
+
+.login-logo p {
+    color: var(--text-secondary);
+    font-size: 15px;
+    line-height: 1.4;
+}
+
+.login-logo .brand-name {
+    font-size: 14px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-tertiary);
+    margin-bottom: 8px;
+}
+
+.google-login-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    padding: 16px;
+    background: #1c1c1e;
+    color: #fff;
+    border-radius: var(--border-radius-full);
+    font-size: 16px;
+    font-weight: 600;
+    transition: all var(--transition-fast);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.google-login-btn:active {
+    transform: scale(0.98);
+    background: #f2f2f2;
+}
+
+.google-login-btn svg {
+    width: 24px;
+    height: 24px;
+}
+
+.login-note {
+    margin-top: 24px;
+    font-size: 13px;
+    color: #666;
+}

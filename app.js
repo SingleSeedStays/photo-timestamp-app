@@ -148,6 +148,12 @@ class PhotoTimestampApp {
         // Apply saved settings to UI
         this.applySettingsToUI();
 
+        console.log('App initialized, waiting for auth...');
+    }
+
+    async startApp() {
+        console.log('Auth confirmed, starting camera...');
+        
         // Try to start camera
         await this.startCamera();
 
