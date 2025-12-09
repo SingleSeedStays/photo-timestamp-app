@@ -7,6 +7,7 @@ class GoogleDriveService {
         this.rootFolderId = null;
         this.spreadsheetId = null;
         this.tokenClient = null;
+        this.userEmail = null;
 
         // UI Elements
         this.signInBtn = document.getElementById('googleSignInBtn');
@@ -96,11 +97,29 @@ class GoogleDriveService {
         localStorage.setItem('googleAccessToken', this.accessToken);
         localStorage.setItem('googleTokenExpiry', Date.now() + 3500000);
 
+        // Get user email
+        this.getUserEmail();
+
         this.updateSignInUI();
         this.showSyncStatus('Signed in!', 'success');
 
         // Set up Drive folders
         this.setupDriveFolders();
+    }
+
+    async getUserEmail() {
+        try {
+            const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+                headers: { 'Authorization': `Bearer ${this.accessToken}` }
+            });
+            const userInfo = await response.json();
+            this.userEmail = userInfo.email || 'unknown';
+            localStorage.setItem('googleUserEmail', this.userEmail);
+            console.log('User email:', this.userEmail);
+        } catch (error) {
+            console.error('Error getting user email:', error);
+            this.userEmail = 'unknown';
+        }
     }
 
     signOut() {
@@ -289,7 +308,8 @@ class GoogleDriveService {
                                 { userEnteredValue: { stringValue: 'Time' } },
                                 { userEnteredValue: { stringValue: 'Filename' } },
                                 { userEnteredValue: { stringValue: 'GPS Coordinates' } },
-                                { userEnteredValue: { stringValue: 'Drive Link' } }
+                                { userEnteredValue: { stringValue: 'Drive Link' } },
+                                { userEnteredValue: { stringValue: 'Uploaded By' } }
                             ]
                         }]
                     }]
@@ -333,7 +353,8 @@ class GoogleDriveService {
         const now = new Date();
         const dateStr = now.toISOString().split('T')[0]; // 2025-12-08
         const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-'); // 17-30-00
-        const filename = `photo_${timeStr}.jpg`;
+        const emailPrefix = this.userEmail ? this.userEmail.split('@')[0] : 'unknown';
+        const filename = `${property}_${dateStr}_${timeStr}_${emailPrefix}.jpg`;
 
         this.showSyncStatus('Uploading...', 'uploading');
 
@@ -425,11 +446,12 @@ class GoogleDriveService {
         const gpsStr = this.currentLocation
             ? `${this.currentLocation.lat.toFixed(6)}, ${this.currentLocation.lng.toFixed(6)}`
             : 'N/A';
+        const uploadedBy = this.userEmail || 'unknown';
 
-        const values = [[propertyName, dateStr, timeStr, filename, gpsStr, driveLink || '']];
+        const values = [[propertyName, dateStr, timeStr, filename, gpsStr, driveLink || '', uploadedBy]];
 
         await fetch(
-            `https://sheets.googleapis.com/v4/spreadsheets/${this.spreadsheetId}/values/Photo Log!A:F:append?valueInputOption=USER_ENTERED`,
+            `https://sheets.googleapis.com/v4/spreadsheets/${this.spreadsheetId}/values/Photo Log!A:G:append?valueInputOption=USER_ENTERED`,
             {
                 method: 'POST',
                 headers: {
