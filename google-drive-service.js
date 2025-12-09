@@ -473,7 +473,13 @@ class GoogleDriveService {
     }
 
     async logToSpreadsheet(propertyName, date, filename, driveLink) {
-        if (!this.spreadsheetId) return;
+        // Always use the hardcoded spreadsheet ID
+        const spreadsheetId = GOOGLE_CONFIG.spreadsheetId;
+
+        if (!spreadsheetId) {
+            console.error('No spreadsheet ID configured');
+            return;
+        }
 
         // Format date and time in Eastern Standard Time for spreadsheet
         const estOptions = { timeZone: 'America/New_York' };
@@ -486,17 +492,49 @@ class GoogleDriveService {
 
         const values = [[propertyName, dateStr, timeStr, filename, gpsStr, driveLink || '', uploadedBy]];
 
-        await fetch(
-            `https://sheets.googleapis.com/v4/spreadsheets/${this.spreadsheetId}/values/Photo Log!A:G:append?valueInputOption=USER_ENTERED`,
-            {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.accessToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ values })
+        console.log('Logging to spreadsheet:', spreadsheetId);
+
+        try {
+            // First get the sheet name dynamically to avoid errors
+            const metadataResponse = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`,
+                {
+                    headers: { 'Authorization': `Bearer ${this.accessToken}` }
+                }
+            );
+
+            if (!metadataResponse.ok) {
+                const error = await metadataResponse.json();
+                console.error('Failed to get spreadsheet metadata:', error);
+                return;
             }
-        );
+
+            const metadata = await metadataResponse.json();
+            // Use the title of the first sheet (tab)
+            const sheetTitle = metadata.sheets[0].properties.title;
+            console.log('Using sheet title:', sheetTitle);
+
+            const response = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(sheetTitle)}!A:G:append?valueInputOption=USER_ENTERED`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${this.accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ values })
+                }
+            );
+
+            const result = await response.json();
+            console.log('Spreadsheet result:', result);
+
+            if (!response.ok) {
+                console.error('Spreadsheet error:', result);
+            }
+        } catch (error) {
+            console.error('Spreadsheet logging failed:', error);
+        }
     }
 
     dataUrlToBlob(dataUrl) {
