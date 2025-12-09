@@ -514,6 +514,9 @@ class GoogleDriveService {
             const sheetTitle = metadata.sheets[0].properties.title;
             console.log('Using sheet title:', sheetTitle);
 
+            // Check if we need to add headers (if file is empty or missing headers)
+            await this.checkAndAddHeaders(spreadsheetId, sheetTitle);
+
             const response = await fetch(
                 `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(sheetTitle)}!A:G:append?valueInputOption=USER_ENTERED`,
                 {
@@ -534,6 +537,48 @@ class GoogleDriveService {
             }
         } catch (error) {
             console.error('Spreadsheet logging failed:', error);
+        }
+    }
+
+    async checkAndAddHeaders(spreadsheetId, sheetTitle) {
+        try {
+            // Check first row
+            const response = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(sheetTitle)}!A1:G1`,
+                {
+                    headers: { 'Authorization': `Bearer ${this.accessToken}` }
+                }
+            );
+
+            const result = await response.json();
+
+            // If no values or first cell is not "Property Name", add headers
+            if (!result.values || result.values.length === 0 || result.values[0][0] !== 'Property Name') {
+                console.log('Adding headers to spreadsheet...');
+                const headers = [['Property Name', 'Date', 'Time', 'Filename', 'GPS Coordinates', 'Drive Link', 'Uploaded By']];
+
+                // Insert at the top (prepend) by using insertDataOption=INSERT_ROWS if you wanted to push down, 
+                // but since we want to possibly overwrite or just ensure they exist if empty:
+
+                // If it's completely empty, append is fine. If it has data but no headers, we might want to insert.
+                // For safety/simplification, we'll just PREPEND using a separate insert call if it appears empty/wrong.
+                // Actually, if we just append, it goes to bottom. We want A1.
+
+                await fetch(
+                    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(sheetTitle)}!A1:G1?valueInputOption=USER_ENTERED`,
+                    {
+                        method: 'PUT', // Overwrite A1:G1
+                        headers: {
+                            'Authorization': `Bearer ${this.accessToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ values: headers })
+                    }
+                );
+                console.log('Headers added');
+            }
+        } catch (error) {
+            console.error('Error checking headers:', error);
         }
     }
 
