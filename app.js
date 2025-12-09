@@ -68,6 +68,12 @@ class PhotoTimestampApp {
         this.photoQualitySelect = document.getElementById('photoQuality');
         this.colorBtns = document.querySelectorAll('.color-btn');
         this.clearAllPhotosBtn = document.getElementById('clearAllPhotosBtn');
+
+        // Confirm modal
+        this.confirmModal = document.getElementById('confirmModal');
+        this.confirmMessage = document.getElementById('confirmMessage');
+        this.confirmOkBtn = document.getElementById('confirmOkBtn');
+        this.confirmCancelBtn = document.getElementById('confirmCancelBtn');
     }
 
     initializeEventListeners() {
@@ -422,14 +428,12 @@ class PhotoTimestampApp {
     deleteCurrentPhoto() {
         if (this.currentPhotoIndex === null) return;
 
-        if (confirm('Delete this photo?')) {
+        this.showConfirm('Delete this photo?', () => {
             this.photos.splice(this.currentPhotoIndex, 1);
             this.savePhotos();
             this.renderGallery();
             this.closePhotoModal();
-            this.photoModal.classList.add('hidden');
-            this.currentPhotoIndex = null;
-        }
+        });
     }
 
     downloadCurrentPhoto() {
@@ -530,12 +534,39 @@ class PhotoTimestampApp {
     }
 
     clearAllPhotos() {
-        if (confirm('Delete all photos? This cannot be undone.')) {
+        this.showConfirm('Delete all photos? This cannot be undone.', () => {
             this.photos = [];
             this.savePhotos();
             this.renderGallery();
             this.closeSettings();
-        }
+        });
+    }
+
+    showConfirm(message, onConfirm) {
+        this.confirmMessage.textContent = message;
+        this.confirmModal.classList.remove('hidden');
+
+        // Remove any existing listeners
+        const newOkBtn = this.confirmOkBtn.cloneNode(true);
+        const newCancelBtn = this.confirmCancelBtn.cloneNode(true);
+        this.confirmOkBtn.parentNode.replaceChild(newOkBtn, this.confirmOkBtn);
+        this.confirmCancelBtn.parentNode.replaceChild(newCancelBtn, this.confirmCancelBtn);
+        this.confirmOkBtn = newOkBtn;
+        this.confirmCancelBtn = newCancelBtn;
+
+        // Add new listeners
+        this.confirmOkBtn.addEventListener('click', () => {
+            this.confirmModal.classList.add('hidden');
+            onConfirm();
+        });
+
+        this.confirmCancelBtn.addEventListener('click', () => {
+            this.confirmModal.classList.add('hidden');
+        });
+
+        this.confirmModal.querySelector('.modal-backdrop').addEventListener('click', () => {
+            this.confirmModal.classList.add('hidden');
+        });
     }
 
     hideStates() {

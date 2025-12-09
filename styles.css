@@ -816,3 +816,64 @@ video {
 .sync-message {
     line-height: 1;
 }
+
+/* ===== Custom Confirm Modal ===== */
+.confirm-content {
+    max-width: 320px;
+    margin: auto;
+    border-radius: var(--border-radius-lg);
+    text-align: center;
+}
+
+.confirm-header {
+    padding: 20px 20px 10px;
+}
+
+.confirm-title {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.confirm-body {
+    padding: 10px 20px 20px;
+}
+
+.confirm-body p {
+    font-size: 15px;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.confirm-actions {
+    display: flex;
+    border-top: 1px solid var(--bg-glass-light);
+}
+
+.confirm-btn {
+    flex: 1;
+    padding: 16px;
+    font-size: 17px;
+    font-weight: 500;
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.confirm-btn:first-child {
+    border-right: 1px solid var(--bg-glass-light);
+}
+
+.confirm-btn.cancel {
+    color: var(--accent-primary);
+}
+
+.confirm-btn.danger {
+    color: var(--danger);
+    font-weight: 600;
+}
+
+.confirm-btn:active {
+    background: var(--bg-glass-light);
+}
