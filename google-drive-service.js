@@ -237,22 +237,30 @@ class GoogleDriveService {
     }
 
     async findOrCreateFolder(name, parentId) {
-        // Search for existing folder in shared folder
-        const query = `name='${name}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`;
+        // List all files in parent folder to find existing folder
+        try {
+            const listResponse = await fetch(
+                `https://www.googleapis.com/drive/v3/files?q='${parentId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType)`,
+                {
+                    headers: { 'Authorization': `Bearer ${this.accessToken}` }
+                }
+            );
 
-        const searchResponse = await fetch(
-            `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=allDrives`,
-            {
-                headers: { 'Authorization': `Bearer ${this.accessToken}` }
+            const listResult = await listResponse.json();
+            console.log('Files in parent folder:', listResult);
+
+            // Find folder with matching name
+            if (listResult.files) {
+                const existingFolder = listResult.files.find(
+                    f => f.name === name && f.mimeType === 'application/vnd.google-apps.folder'
+                );
+                if (existingFolder) {
+                    console.log('Found existing folder:', name, existingFolder.id);
+                    return existingFolder.id;
+                }
             }
-        );
-
-        const searchResult = await searchResponse.json();
-        console.log('Folder search result for', name, ':', searchResult);
-
-        if (searchResult.files && searchResult.files.length > 0) {
-            console.log('Found existing folder:', name, searchResult.files[0].id);
-            return searchResult.files[0].id;
+        } catch (error) {
+            console.error('Error searching for folder:', error);
         }
 
         // Create new folder
@@ -274,23 +282,31 @@ class GoogleDriveService {
     }
 
     async findOrCreateSpreadsheet() {
-        // Search for existing spreadsheet in shared folder
-        const query = `name='${GOOGLE_CONFIG.spreadsheetName}' and mimeType='application/vnd.google-apps.spreadsheet' and '${this.rootFolderId}' in parents and trashed=false`;
+        // List all files in root folder to find existing spreadsheet
+        try {
+            const listResponse = await fetch(
+                `https://www.googleapis.com/drive/v3/files?q='${this.rootFolderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType)`,
+                {
+                    headers: { 'Authorization': `Bearer ${this.accessToken}` }
+                }
+            );
 
-        const searchResponse = await fetch(
-            `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=allDrives`,
-            {
-                headers: { 'Authorization': `Bearer ${this.accessToken}` }
+            const listResult = await listResponse.json();
+            console.log('Files in root folder:', listResult);
+
+            // Find spreadsheet with matching name
+            if (listResult.files) {
+                const existingSpreadsheet = listResult.files.find(
+                    f => f.name === GOOGLE_CONFIG.spreadsheetName && f.mimeType === 'application/vnd.google-apps.spreadsheet'
+                );
+                if (existingSpreadsheet) {
+                    this.spreadsheetId = existingSpreadsheet.id;
+                    console.log('Found existing spreadsheet:', this.spreadsheetId);
+                    return;
+                }
             }
-        );
-
-        const searchResult = await searchResponse.json();
-        console.log('Spreadsheet search result:', searchResult);
-
-        if (searchResult.files && searchResult.files.length > 0) {
-            this.spreadsheetId = searchResult.files[0].id;
-            console.log('Found existing spreadsheet:', this.spreadsheetId);
-            return;
+        } catch (error) {
+            console.error('Error searching for spreadsheet:', error);
         }
 
         // Create new spreadsheet
