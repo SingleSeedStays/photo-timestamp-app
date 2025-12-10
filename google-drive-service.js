@@ -124,17 +124,25 @@ class GoogleDriveService {
     async onLoginSuccess() {
         this.hideLoginModal();
 
-        // Start GPS acquisition in the background (non-blocking)
-        // Show a subtle indicator while acquiring
-        this.showGpsAcquiringIndicator();
-        this.getCurrentLocation()
+        // Show GPS overlay blocking the capture button
+        this.showGpsOverlay();
+
+        // Start GPS acquisition with a timeout
+        const gpsPromise = this.getCurrentLocation();
+        const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 10000));
+
+        Promise.race([gpsPromise, timeoutPromise])
             .then(() => {
-                console.log('GPS acquired:', this.currentLocation);
-                this.hideGpsAcquiringIndicator();
+                if (this.currentLocation) {
+                    console.log('GPS acquired:', this.currentLocation);
+                } else {
+                    console.log('GPS timeout - proceeding without location');
+                }
+                this.hideGpsOverlay();
             })
             .catch((error) => {
                 console.warn('GPS acquisition failed:', error.message);
-                this.hideGpsAcquiringIndicator();
+                this.hideGpsOverlay();
             });
 
         // Start the app (camera, etc.) immediately - don't block on GPS
@@ -143,36 +151,73 @@ class GoogleDriveService {
         }
     }
 
-    showGpsAcquiringIndicator() {
-        // Create a subtle GPS indicator if it doesn't exist
-        let indicator = document.getElementById('gpsAcquiringIndicator');
-        if (!indicator) {
-            indicator = document.createElement('div');
-            indicator.id = 'gpsAcquiringIndicator';
-            indicator.innerHTML = '📍 Getting location...';
-            indicator.style.cssText = `
-                position: fixed;
-                top: 60px;
-                left: 50%;
-                transform: translateX(-50%);
-                background: rgba(0, 0, 0, 0.7);
-                color: white;
-                padding: 8px 16px;
-                border-radius: 20px;
-                font-size: 12px;
-                z-index: 1000;
-                animation: pulse 1.5s ease-in-out infinite;
+    showGpsOverlay() {
+        // Create overlay that covers the capture button area
+        let overlay = document.getElementById('gpsOverlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'gpsOverlay';
+            overlay.innerHTML = `
+                <div class="gps-overlay-content">
+                    <div class="gps-icon">📍</div>
+                    <div class="gps-text">Getting Location</div>
+                    <div class="gps-dots"><span>.</span><span>.</span><span>.</span></div>
+                </div>
             `;
-            document.body.appendChild(indicator);
+            overlay.style.cssText = `
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: 200px;
+                background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.8) 70%, transparent 100%);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 999;
+                pointer-events: auto;
+            `;
+            document.body.appendChild(overlay);
 
-            // Add pulse animation if not already present
-            if (!document.getElementById('gpsIndicatorStyle')) {
+            // Add styles for the overlay content
+            if (!document.getElementById('gpsOverlayStyle')) {
                 const style = document.createElement('style');
-                style.id = 'gpsIndicatorStyle';
+                style.id = 'gpsOverlayStyle';
                 style.textContent = `
-                    @keyframes pulse {
-                        0%, 100% { opacity: 0.7; }
-                        50% { opacity: 1; }
+                    .gps-overlay-content {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        color: white;
+                        text-align: center;
+                    }
+                    .gps-icon {
+                        font-size: 48px;
+                        animation: bounce 1s ease-in-out infinite;
+                    }
+                    .gps-text {
+                        font-size: 16px;
+                        font-weight: 500;
+                        margin-top: 8px;
+                        letter-spacing: 1px;
+                    }
+                    .gps-dots {
+                        font-size: 24px;
+                        margin-top: 4px;
+                    }
+                    .gps-dots span {
+                        animation: blink 1.4s infinite;
+                        animation-fill-mode: both;
+                    }
+                    .gps-dots span:nth-child(2) { animation-delay: 0.2s; }
+                    .gps-dots span:nth-child(3) { animation-delay: 0.4s; }
+                    @keyframes bounce {
+                        0%, 100% { transform: translateY(0); }
+                        50% { transform: translateY(-10px); }
+                    }
+                    @keyframes blink {
+                        0%, 80%, 100% { opacity: 0; }
+                        40% { opacity: 1; }
                     }
                 `;
                 document.head.appendChild(style);
@@ -180,12 +225,16 @@ class GoogleDriveService {
         }
     }
 
-    hideGpsAcquiringIndicator() {
-        const indicator = document.getElementById('gpsAcquiringIndicator');
-        if (indicator) {
-            indicator.remove();
+    hideGpsOverlay() {
+        const overlay = document.getElementById('gpsOverlay');
+        if (overlay) {
+            // Fade out animation
+            overlay.style.transition = 'opacity 0.3s ease-out';
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 300);
         }
     }
+
 
 
     showLoginModal() {
