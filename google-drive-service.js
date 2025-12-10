@@ -96,7 +96,7 @@ class GoogleDriveService {
         }
     }
 
-    handleAuthResponse(response) {
+    async handleAuthResponse(response) {
         if (response.error) {
             console.error('Auth error:', response.error);
             this.showSyncStatus('Sign-in failed', 'error');
@@ -110,19 +110,37 @@ class GoogleDriveService {
         localStorage.setItem('googleAccessToken', this.accessToken);
         localStorage.setItem('googleTokenExpiry', Date.now() + 3500000);
 
-        // Get user email
-        this.getUserEmail();
+        // Get user email - AWAIT to ensure it's ready before photo capture
+        await this.getUserEmail();
 
         this.updateSignInUI();
         this.showSyncStatus('Signed in!', 'success');
-        this.onLoginSuccess();
+        await this.onLoginSuccess();
 
         // Set up Drive folders
         this.setupDriveFolders();
     }
 
-    onLoginSuccess() {
+    async onLoginSuccess() {
         this.hideLoginModal();
+
+        // Wait for GPS location before starting the app
+        // This ensures location is ready before user can take photos
+        try {
+            this.showSyncStatus('Getting location...', 'uploading');
+            // Wait up to 10 seconds for GPS, but don't block forever
+            await Promise.race([
+                this.getCurrentLocation(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('GPS timeout')), 10000))
+            ]);
+            console.log('GPS acquired before starting app:', this.currentLocation);
+            this.hideSyncStatus();
+        } catch (error) {
+            console.warn('Could not get GPS before starting app:', error.message);
+            this.showSyncStatus('Location unavailable', 'error');
+            // Continue anyway - app can still function, just without location
+        }
+
         // Start the app (camera, etc.) once logged in
         if (window.app && typeof window.app.startApp === 'function') {
             window.app.startApp();
