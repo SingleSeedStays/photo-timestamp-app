@@ -124,28 +124,69 @@ class GoogleDriveService {
     async onLoginSuccess() {
         this.hideLoginModal();
 
-        // Wait for GPS location before starting the app
-        // This ensures location is ready before user can take photos
-        try {
-            this.showSyncStatus('Getting location...', 'uploading');
-            // Wait up to 10 seconds for GPS, but don't block forever
-            await Promise.race([
-                this.getCurrentLocation(),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('GPS timeout')), 10000))
-            ]);
-            console.log('GPS acquired before starting app:', this.currentLocation);
-            this.hideSyncStatus();
-        } catch (error) {
-            console.warn('Could not get GPS before starting app:', error.message);
-            this.showSyncStatus('Location unavailable', 'error');
-            // Continue anyway - app can still function, just without location
-        }
+        // Start GPS acquisition in the background (non-blocking)
+        // Show a subtle indicator while acquiring
+        this.showGpsAcquiringIndicator();
+        this.getCurrentLocation()
+            .then(() => {
+                console.log('GPS acquired:', this.currentLocation);
+                this.hideGpsAcquiringIndicator();
+            })
+            .catch((error) => {
+                console.warn('GPS acquisition failed:', error.message);
+                this.hideGpsAcquiringIndicator();
+            });
 
-        // Start the app (camera, etc.) once logged in
+        // Start the app (camera, etc.) immediately - don't block on GPS
         if (window.app && typeof window.app.startApp === 'function') {
             window.app.startApp();
         }
     }
+
+    showGpsAcquiringIndicator() {
+        // Create a subtle GPS indicator if it doesn't exist
+        let indicator = document.getElementById('gpsAcquiringIndicator');
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.id = 'gpsAcquiringIndicator';
+            indicator.innerHTML = '📍 Getting location...';
+            indicator.style.cssText = `
+                position: fixed;
+                top: 60px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(0, 0, 0, 0.7);
+                color: white;
+                padding: 8px 16px;
+                border-radius: 20px;
+                font-size: 12px;
+                z-index: 1000;
+                animation: pulse 1.5s ease-in-out infinite;
+            `;
+            document.body.appendChild(indicator);
+
+            // Add pulse animation if not already present
+            if (!document.getElementById('gpsIndicatorStyle')) {
+                const style = document.createElement('style');
+                style.id = 'gpsIndicatorStyle';
+                style.textContent = `
+                    @keyframes pulse {
+                        0%, 100% { opacity: 0.7; }
+                        50% { opacity: 1; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+        }
+    }
+
+    hideGpsAcquiringIndicator() {
+        const indicator = document.getElementById('gpsAcquiringIndicator');
+        if (indicator) {
+            indicator.remove();
+        }
+    }
+
 
     showLoginModal() {
         if (this.loginModal) {
